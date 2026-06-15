@@ -1,0 +1,7 @@
+# Cross-origin isolation enables tesseract.js multi-threaded WASM (faster OCR).
+# `credentialless` (not `require-corp`) lets the CDN-hosted language data load
+# without a CORP header. Chromium isolates and goes multi-threaded; Safari
+# ignores credentialless and falls back to single-threaded (still works).
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
