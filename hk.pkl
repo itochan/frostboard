@@ -1,0 +1,39 @@
+amends "package://github.com/jdx/hk/releases/download/v1.46.0/hk@1.46.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.46.0/hk@1.46.0#/Builtins.pkl"
+
+// Lint + format (Biome) and general hygiene checks.
+local linters = new Mapping<String, Step> {
+    ["biome"] = Builtins.biome
+    ["trailing_whitespace"] = Builtins.trailing_whitespace
+    ["newlines"] = Builtins.newlines
+    ["check_merge_conflict"] = Builtins.check_merge_conflict
+    ["check_added_large_files"] = Builtins.check_added_large_files
+    ["detect_private_key"] = Builtins.detect_private_key
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "git"
+        steps = linters
+    }
+    ["commit-msg"] {
+        steps {
+            ["check_conventional_commit"] = Builtins.check_conventional_commit
+        }
+    }
+    ["pre-push"] {
+        steps {
+            ["test"] {
+                check = "aube test"
+            }
+        }
+    }
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps = linters
+    }
+}
