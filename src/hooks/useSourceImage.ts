@@ -3,12 +3,14 @@ import { useCallback, useState } from "react";
 /**
  * Cap the working image's long edge. Phone screenshots/photos can be very
  * large (10+ MP); holding full-resolution pixels crashes mobile WebKit (out of
- * memory). Detection downscales to 400px internally and exported coordinates
- * are resolution-independent, so a capped working image loses no useful
- * accuracy. 1400px keeps typical phone screenshots near-native while keeping
- * the in-memory bitmap small.
+ * memory). Region detection downscales to 400px internally and exported
+ * coordinates are resolution-independent, so it is unaffected far below this.
+ * The binding constraint is OCR: the score crop is upscaled ~3x before
+ * recognition, so too small a working image blurs the digits. 1000px is the
+ * balance point (detection solid, OCR still legible, ~half the memory of 1400).
+ * Lower it further only if OCR accuracy is not needed.
  */
-const MAX_EDGE = 1400;
+const MAX_EDGE = 1000;
 
 export interface SourceImage {
 	/**
