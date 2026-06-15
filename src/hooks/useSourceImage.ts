@@ -1,20 +1,22 @@
 import { useCallback, useState } from "react";
-import type { ImageLike } from "../lib/types";
 
 /**
  * Cap the working image's long edge. Phone screenshots/photos can be very
- * large (10+ MP); holding a full-resolution canvas + ImageData crashes mobile
- * WebKit (out of memory). Detection downscales to 400px internally and the
- * exported coordinates are resolution-independent, so a capped working image
- * loses no useful accuracy. 2000px keeps typical screenshots near-native.
+ * large (10+ MP); holding full-resolution pixels crashes mobile WebKit (out of
+ * memory). Detection downscales to 400px internally and exported coordinates
+ * are resolution-independent, so a capped working image loses no useful
+ * accuracy. 1400px keeps typical phone screenshots near-native while keeping
+ * the in-memory bitmap small.
  */
-const MAX_EDGE = 2000;
+const MAX_EDGE = 1400;
 
 export interface SourceImage {
-	/** Offscreen canvas holding the working-resolution image (for cropping). */
+	/**
+	 * Offscreen canvas holding the working-resolution image. This is the ONLY
+	 * full-size pixel buffer kept on the main thread (used for crop/preview/OCR
+	 * and to seed the detection worker); detection reads pixels from here.
+	 */
 	canvas: HTMLCanvasElement;
-	/** Working-resolution pixels; structurally an ImageLike for the algorithms. */
-	imageData: ImageLike;
 	/** Working (possibly downscaled) dimensions. */
 	width: number;
 	height: number;
@@ -26,8 +28,10 @@ export interface SourceImage {
 }
 
 /**
- * Decode an image File into an offscreen canvas + ImageData, downscaling to a
- * safe working size. The returned ImageData is passed straight to detection.
+ * Decode an image File into an offscreen canvas, downscaling to a safe working
+ * size. No ImageData is retained here — the detection worker extracts pixels
+ * from the canvas on demand, so only one full-size buffer lives on the main
+ * thread.
  */
 export function useSourceImage(): {
 	source: SourceImage | null;
@@ -60,11 +64,9 @@ export function useSourceImage(): {
 					return;
 				}
 				ctx.drawImage(img, 0, 0, width, height);
-				const imageData = ctx.getImageData(0, 0, width, height);
 				URL.revokeObjectURL(url);
 				setSource({
 					canvas,
-					imageData,
 					width,
 					height,
 					naturalWidth,

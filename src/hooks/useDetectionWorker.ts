@@ -66,12 +66,15 @@ export function useDetectionWorker(
 	);
 
 	// Hand the (downscaled) pixels to the worker whenever the image changes.
+	// Pixels are read fresh from the canvas and the buffer is transferred (not
+	// copied), so the main thread keeps only the canvas — no duplicate buffer.
 	useEffect(() => {
 		setReady(false);
 		if (!source) return;
 		let cancelled = false;
-		// Copy so the main thread keeps its ImageData, then transfer the copy.
-		const data = new Uint8ClampedArray(source.imageData.data);
+		const ctx = source.canvas.getContext("2d", { willReadFrequently: true });
+		if (!ctx) return;
+		const { data } = ctx.getImageData(0, 0, source.width, source.height);
 		send(
 			{ kind: "setImage", data, width: source.width, height: source.height },
 			[data.buffer],
