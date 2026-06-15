@@ -14,8 +14,11 @@ interface ScorePanelProps {
 function coordsText(sel: Rect | null, source: SourceImage | null): string {
 	if (!sel || !source) return "領域はまだ未検出";
 	const f = (n: number) => n.toFixed(4);
+	// Relative coords are scale-invariant. px is reported in the original
+	// screenshot's resolution (the working image may be downscaled).
+	const o = (n: number) => Math.round(n / source.scale);
 	const rel = `x=${f(sel.x / source.width)} y=${f(sel.y / source.height)} w=${f(sel.w / source.width)} h=${f(sel.h / source.height)}`;
-	return `px : x=${sel.x} y=${sel.y} w=${sel.w} h=${sel.h}\n相対: ${rel}`;
+	return `px : x=${o(sel.x)} y=${o(sel.y)} w=${o(sel.w)} h=${o(sel.h)}\n相対: ${rel}`;
 }
 
 export function ScorePanel({ source, sel, scale, onScale }: ScorePanelProps) {
