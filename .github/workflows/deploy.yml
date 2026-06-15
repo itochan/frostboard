@@ -8,18 +8,34 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Requires repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID,
-    # and a Cloudflare Pages project named "frostboard".
+    # Deploys to Cloudflare Pages. Requires repository secrets
+    # CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, plus a Pages project named
+    # "frostboard" (create once: `aube exec wrangler pages project create frostboard`).
+    # When the secrets are absent the job skips every real step and stays green,
+    # so main is not blocked before Cloudflare is set up.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      - name: Check Cloudflare configuration
+        id: cf
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets not set — skipping deploy."
+          fi
       - uses: actions/checkout@v4
+        if: steps.cf.outputs.ready == 'true'
       - uses: jdx/mise-action@v2
+        if: steps.cf.outputs.ready == 'true'
       - name: Install dependencies
+        if: steps.cf.outputs.ready == 'true'
         run: aube ci
       - name: Build
+        if: steps.cf.outputs.ready == 'true'
         run: aube run build
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=frostboard
+        if: steps.cf.outputs.ready == 'true'
+        run: aube exec wrangler pages deploy dist --project-name=frostboard --branch=main
