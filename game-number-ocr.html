@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スコア領域 自動検出 + OCR</title>
+<style>
+  :root{--bg:#0f1924;--panel:#16232f;--panel2:#1d2e3c;--line:#2a3e4f;--ice:#8fd3ff;--accent:#ff7a3c;
+    --text:#e8f0f6;--muted:#8aa0b0;--ok:#5fd38b;--warn:#ffcf5f;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 16px 60px}
+  header h1{font-size:21px;font-weight:800;margin:0 0 4px}
+  header p{color:var(--muted);margin:0 0 18px;font-size:13px}
+  .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ice);margin:0 0 12px}
+  #stage{position:relative;border:1.5px dashed var(--line);border-radius:10px;background:var(--panel2);
+    min-height:220px;max-height:58vh;overflow:auto;display:flex;align-items:flex-start;-webkit-overflow-scrolling:touch}
+  #stage.empty{align-items:center;justify-content:center;cursor:pointer}
+  #imgWrap{position:relative;flex:0 0 auto}
+  #imgWrap canvas{display:block;touch-action:none}
+  #hint{color:var(--muted);font-size:13px;text-align:center;padding:34px;pointer-events:none}
+  #sel{position:absolute;border:2px solid var(--accent);background:rgba(255,122,60,.16);display:none;pointer-events:none;left:0;top:0}
+  #band{position:absolute;border:1.5px dashed var(--ice);display:none;pointer-events:none;left:0;top:0}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-left:8px}
+  .seg button{background:var(--panel2);color:var(--muted);border:0;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#1a0e06}
+  .bigbtn{background:var(--accent);color:#1a0e06;border:0;border-radius:10px;padding:11px 16px;font-weight:800;font-size:14px;cursor:pointer}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  label.ctl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:120px;flex:1}
+  select,input[type=range]{width:100%}
+  select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+  input[type=range]{accent-color:var(--accent)}
+  .switch{flex-direction:row;align-items:center;gap:8px;min-width:auto;flex:0;color:var(--text)}
+  button.act{font-family:inherit;font-weight:700;border:0;border-radius:10px;padding:10px 15px;cursor:pointer;font-size:14px}
+  .primary{background:var(--accent);color:#1a0e06}.primary:disabled{opacity:.45;cursor:not-allowed}
+  .ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .val{color:var(--ice);font-weight:700}.sw{width:18px;height:18px;border-radius:5px;border:1px solid var(--line);display:inline-block;vertical-align:middle}
+  #preview{width:100%;background:#fff;border-radius:8px;border:1px solid var(--line);image-rendering:pixelated;min-height:48px}
+  #coords{font-family:ui-monospace,monospace;font-size:12px;color:var(--ice);background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;margin-top:8px;white-space:pre;overflow:auto;min-height:20px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .chip{background:#11324a;border:1px solid #2f5f7e;color:#bfe6ff;border-radius:8px;padding:6px 12px;font-family:ui-monospace,monospace;font-size:17px;font-weight:700;cursor:pointer}
+  .chip:active{background:var(--accent);color:#1a0e06}
+  #out{width:100%;min-height:44px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-family:ui-monospace,monospace;font-size:15px;padding:9px;resize:vertical;margin-top:8px}
+  .meta{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}.meta b{color:var(--ok)}.meta .w{color:var(--warn)}
+  .tip{font-size:12px;color:var(--muted);margin:12px 0 0;padding-left:16px}
+  footer{color:var(--muted);font-size:12px;margin-top:24px;border-top:1px solid var(--line);padding-top:14px}
+  a{color:var(--ice)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>スコア領域 自動検出</h1>
+    <p>帯を自動検出 → 投影法で右下のスコア行だけを抽出。OCRは任意。全部ローカル処理。</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+        <button class="bigbtn" id="autoBtn" disabled>▶ 自動でスコアを検出</button>
+        <span style="font-size:12px;color:var(--muted)">うまくいかない時:</span>
+        <div class="seg" id="modeSeg">
+          <button data-m="pick" class="on">スポイト</button>
+          <button data-m="drag">手動ドラッグ</button>
+        </div>
+      </div>
+      <div id="stage" class="empty" style="margin-top:12px">
+        <div id="hint">タップで画像を選択<br>(ドラッグ&ドロップも可)</div>
+        <div id="imgWrap"><div id="band"></div><div id="sel"></div></div>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="row">
+        <label class="ctl">表示ズーム <span class="val" id="zoomV">1.0×</span>
+          <input type="range" id="zoom" min="1" max="6" step="0.5" value="1"></label>
+        <label class="ctl switch"><input type="checkbox" id="scoreOnly" checked> 右下のスコア行だけに絞る</label>
+      </div>
+      <div class="row">
+        <label class="ctl">右側の開始位置 <span class="val" id="rstartV">0.35</span>
+          <input type="range" id="rstart" min="0" max="0.7" step="0.05" value="0.35"></label>
+        <label class="ctl">文字検出の感度 <span class="val" id="inktolV">55</span>
+          <input type="range" id="inktol" min="20" max="130" step="5" value="55"></label>
+      </div>
+      <div class="row">
+        <button class="act ghost" id="loadBtn">画像を選ぶ</button>
+        <button class="act ghost" id="clearSel">リセット</button>
+        <span class="meta">背景色 <span class="sw" id="swatch" style="background:#333"></span></span>
+      </div>
+      <p class="tip"><b style="color:var(--ice)">青破線</b>=検出した帯、<b style="color:var(--accent)">橙実線</b>=スコア領域。ずれたら「右側の開始位置」「感度」で微調整、または手動ドラッグ。</p>
+    </div>
+
+    <div class="card">
+      <h2>検出されたスコア領域</h2>
+      <canvas id="preview"></canvas>
+      <div id="coords">領域はまだ未検出</div>
+      <div class="row">
+        <button class="act ghost" id="dlBtn" style="flex:1">この領域をPNG保存</button>
+        <button class="act primary" id="run" disabled style="flex:1">OCR(任意)</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <textarea id="out" placeholder="OCRの生結果(任意)"></textarea>
+      <div class="meta" id="status"></div>
+      <h2 style="margin-top:16px">OCR設定</h2>
+      <div class="row">
+        <label class="ctl">文字
+          <select id="cmode"><option value="digits">数字 (0-9 ,)</option><option value="roman">ローマ数字</option><option value="free">制限なし</option></select></label>
+        <label class="ctl">PSM
+          <select id="psm"><option value="7">1行</option><option value="6">ブロック</option><option value="8">1単語</option></select></label>
+        <label class="ctl">OCR拡大 <span class="val" id="scaleV">3×</span>
+          <input type="range" id="scale" min="1" max="6" step="1" value="3"></label>
+      </div>
+    </div>
+  </div>
+
+  <footer>エンジン: <a href="https://github.com/naptha/tesseract.js" target="_blank" rel="noopener">Tesseract.js v7</a>。
+    領域検出はOCRなしの純画像処理。<span style="color:var(--warn)">プレビューで動かない時</span>は保存して直接開く/自前HTTPS配信を。</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const stage=$('stage'),imgWrap=$('imgWrap'),sel=$('sel'),bandBox=$('band'),fileIn=$('file');
+  const preview=$('preview'),out=$('out'),status=$('status'),chips=$('chips'),coords=$('coords');
+  let img=null,srcCanvas=null,dispCanvas=null,baseFit=1,dispScale=1;
+  let selRect=null,bandRect=null,mode='pick',worker=null,curBg=[60,140,210];
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const sctx=()=>srcCanvas.getContext('2d',{willReadFrequently:true});
+
+  /* ---- load / render ---- */
+  function loadImage(file){
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{img=im;srcCanvas=document.createElement('canvas');
+      srcCanvas.width=im.naturalWidth;srcCanvas.height=im.naturalHeight;
+      sctx().drawImage(im,0,0);
+      stage.classList.remove('empty');$('hint').style.display='none';
+      if(!dispCanvas){dispCanvas=document.createElement('canvas');imgWrap.appendChild(dispCanvas);}
+      $('zoom').value=1;render();selRect=null;bandRect=null;drawSel();
+      $('run').disabled=false;$('autoBtn').disabled=false;
+      URL.revokeObjectURL(url);};
+    im.src=url;}
+  function render(){
+    const fitW=Math.max(200,stage.clientWidth-4);
+    baseFit=Math.min(1,fitW/img.naturalWidth);dispScale=baseFit*parseFloat($('zoom').value);
+    dispCanvas.width=Math.round(img.naturalWidth*dispScale);dispCanvas.height=Math.round(img.naturalHeight*dispScale);
+    imgWrap.style.width=dispCanvas.width+'px';imgWrap.style.height=dispCanvas.height+'px';
+    dispCanvas.getContext('2d').drawImage(img,0,0,dispCanvas.width,dispCanvas.height);drawSel();}
+  function place(el,r){if(!r){el.style.display='none';return;}el.style.display='block';
+    el.style.left=(r.x*dispScale)+'px';el.style.top=(r.y*dispScale)+'px';
+    el.style.width=(r.w*dispScale)+'px';el.style.height=(r.h*dispScale)+'px';}
+  function drawSel(){place(bandBox,bandRect);place(sel,selRect);}
+
+  fileIn.addEventListener('change',e=>{if(e.target.files[0])loadImage(e.target.files[0]);});
+  $('loadBtn').addEventListener('click',()=>fileIn.click());
+  stage.addEventListener('click',()=>{if(stage.classList.contains('empty'))fileIn.click();});
+  ['dragover','dragenter'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();stage.style.borderColor='var(--accent)';}));
+  ['dragleave','drop'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();stage.style.borderColor='';}));
+  stage.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImage(f);});
+
+  $('modeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.m;
+    [...$('modeSeg').children].forEach(x=>x.classList.toggle('on',x===b));
+    if(dispCanvas)dispCanvas.style.cursor=mode==='pick'?'cell':'crosshair';});
+  $('zoom').addEventListener('input',()=>{$('zoomV').textContent=parseFloat($('zoom').value).toFixed(1)+'×';if(img)render();});
+  ['rstart','inktol'].forEach(id=>$(id).addEventListener('input',()=>{$('rstartV').textContent=$('rstart').value;$('inktolV').textContent=$('inktol').value;}));
+
+  /* ---- background color helpers ---- */
+  function modeColor(rx,ry,rw,rh){const d=sctx().getImageData(rx,ry,rw,rh).data;const h={};let best=0,bk=0;
+    for(let i=0;i<d.length;i+=16){const k=((d[i]>>4)<<8)|((d[i+1]>>4)<<4)|(d[i+2]>>4);h[k]=(h[k]||0)+1;if(h[k]>best){best=h[k];bk=k;}}
+    return [((bk>>8)&15)*17,((bk>>4)&15)*17,(bk&15)*17];}
+
+  /* ---- score line isolation (verified against real screenshot) ----
+     1. ink = not the background blue AND low saturation (text is white/dark;
+        the colourful avatar is high-saturation and gets dropped)
+     2. right zone only (x >= rstart*W) so the tall rank number "120" doesn't
+        bridge the name and score rows vertically
+     3. pick the BOTTOM-most text line tall enough to be real (= score, name is above)
+     4. on that line, group ink columns (bridging digit/comma gaps) and take the
+        WIDEST group = the number (rejects stray right-edge noise) */
+  function isolateScore(band,bg){
+    const W=band.w,H=band.h,d=sctx().getImageData(band.x,band.y,W,H).data;
+    const x0=Math.floor(W*parseFloat($('rstart').value));
+    const t=parseInt($('inktol').value),t2=t*t,satMax=0.45;
+    const ink=(o)=>{
+      const r=d[o],g=d[o+1],b=d[o+2];
+      const dr=r-bg[0],dg=g-bg[1],db=b-bg[2];
+      if(dr*dr+dg*dg+db*db<=t2) return false;                 // ~background
+      const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+      if(mx && (mx-mn)/mx>satMax) return false;               // colourful (avatar) -> not text
+      return true;
+    };
+    const rows=new Int32Array(H);let maxR=0;
+    for(let y=0;y<H;y++){let c=0;for(let x=x0;x<W;x++)if(ink((y*W+x)*4))c++;rows[y]=c;if(c>maxR)maxR=c;}
+    if(maxR<3)return null;
+    const thr=maxR*0.15,gapY=Math.max(2,Math.round(H*0.04));
+    const lines=[];let s=-1,last=-1;
+    for(let y=0;y<H;y++){if(rows[y]>thr){if(s<0)s=y;last=y;}else if(s>=0&&y-last>gapY){lines.push([s,last]);s=-1;}}
+    if(s>=0)lines.push([s,last]);
+    const minH=Math.max(5,Math.round(H*0.05));
+    let ln=null;for(let i=lines.length-1;i>=0;i--)if(lines[i][1]-lines[i][0]+1>=minH){ln=lines[i];break;}
+    if(!ln)return null;
+    const cols=new Int32Array(W);let cmax=0;
+    for(let x=x0;x<W;x++){let c=0;for(let y=ln[0];y<=ln[1];y++)if(ink((y*W+x)*4))c++;cols[x]=c;if(c>cmax)cmax=c;}
+    const lineH=ln[1]-ln[0]+1,ct=Math.max(2,cmax*0.18),gapX=Math.round(lineH*0.7);
+    const groups=[];let gs=-1,gl=-1;
+    for(let x=x0;x<W;x++){if(cols[x]>ct){if(gs<0)gs=x;gl=x;}else if(gs>=0&&x-gl>gapX){groups.push([gs,gl]);gs=-1;}}
+    if(gs>=0)groups.push([gs,gl]);
+    const wide=groups.filter(g=>g[1]-g[0]+1>=lineH*0.5);
+    if(!wide.length)return null;
+    let g=wide[0];for(const w of wide)if(w[1]-w[0]>g[1]-g[0])g=w;   // widest = the number
+    const p=4;
+    return{x:band.x+Math.max(0,g[0]-p),y:band.y+Math.max(0,ln[0]-p),
+           w:Math.min(W,g[1]+p)-Math.max(0,g[0]-p),h:Math.min(H,ln[1]+p)-Math.max(0,ln[0]-p)};
+  }
+
+  /* ---- auto band detection: bounding box of the largest connected region of
+         the dominant saturated colour. The band is full of text/avatar, but the
+         blue background wraps around them, so its bbox = the whole band. ---- */
+  function autoBand(){
+    const W0=img.naturalWidth,H0=img.naturalHeight,dw=Math.min(W0,400),s=dw/W0,dh=Math.round(H0*s);
+    const c=document.createElement('canvas');c.width=dw;c.height=dh;
+    const cc=c.getContext('2d',{willReadFrequently:true});cc.drawImage(srcCanvas,0,0,dw,dh);
+    const d=cc.getImageData(0,0,dw,dh).data;
+    // dominant saturated mid-tone colour (= the highlight blue)
+    const h={};let best=0,bk=0;
+    for(let i=0;i<d.length;i+=8){const R=d[i],G=d[i+1],B=d[i+2];
+      const mx=Math.max(R,G,B),mn=Math.min(R,G,B),sat=mx===0?0:(mx-mn)/mx,bri=mx/255;
+      if(sat<0.28||bri<0.25||bri>0.96)continue;
+      const k=((R>>4)<<8)|((G>>4)<<4)|(B>>4);h[k]=(h[k]||0)+1;if(h[k]>best){best=h[k];bk=k;}}
+    if(!best)return null;
+    const bg=[((bk>>8)&15)*17,((bk>>4)&15)*17,(bk&15)*17],tol=46,tol2=tol*tol;
+    const mask=new Uint8Array(dw*dh);
+    for(let i=0,j=0;i<d.length;i+=4,j++){const dr=d[i]-bg[0],dg=d[i+1]-bg[1],db=d[i+2]-bg[2];if(dr*dr+dg*dg+db*db<tol2)mask[j]=1;}
+    // largest connected component (4-conn)
+    const seen=new Uint8Array(dw*dh);let box=null,bestCnt=0;
+    for(let i0=0;i0<mask.length;i0++){
+      if(!mask[i0]||seen[i0])continue;
+      let minX=i0%dw,maxX=minX,minY=(i0/dw)|0,maxY=minY,cnt=0;const stk=[i0];seen[i0]=1;
+      while(stk.length){const p=stk.pop(),px=p%dw,py=(p/dw)|0;cnt++;
+        if(px<minX)minX=px;if(px>maxX)maxX=px;if(py<minY)minY=py;if(py>maxY)maxY=py;
+        if(px+1<dw&&mask[p+1]&&!seen[p+1]){seen[p+1]=1;stk.push(p+1);}
+        if(px-1>=0&&mask[p-1]&&!seen[p-1]){seen[p-1]=1;stk.push(p-1);}
+        if(py+1<dh&&mask[p+dw]&&!seen[p+dw]){seen[p+dw]=1;stk.push(p+dw);}
+        if(py-1>=0&&mask[p-dw]&&!seen[p-dw]){seen[p-dw]=1;stk.push(p-dw);}}
+      if(cnt>bestCnt){bestCnt=cnt;box=[minX,minY,maxX,maxY];}}
+    if(!box)return null;
+    const pad=2,x=clamp(Math.floor(box[0]/s)-pad,0,W0),y=clamp(Math.floor(box[1]/s)-pad,0,H0);
+    return{rect:{x,y,w:clamp(Math.ceil((box[2]+1)/s)+pad,0,W0)-x,h:clamp(Math.ceil((box[3]+1)/s)+pad,0,H0)-y},bg};
+  }
+
+  /* ---- commit a detection ---- */
+  function commit(band,bg){
+    bandRect=band;curBg=bg;$('swatch').style.background=`rgb(${bg[0]},${bg[1]},${bg[2]})`;
+    let sr=band;
+    if($('scoreOnly').checked){const r=isolateScore(band,bg);if(r)sr=r;else status.innerHTML='<span class="w">スコア行を分離できず。感度/開始位置を調整、または手動で。</span>';}
+    selRect=sr;drawSel();buildPreview();showCoords();}
+  function showCoords(){
+    if(!selRect){coords.textContent='領域はまだ未検出';return;}
+    const W=img.naturalWidth,H=img.naturalHeight,r=selRect;
+    const f=n=>n.toFixed(4);
+    coords.textContent=`px : x=${r.x} y=${r.y} w=${r.w} h=${r.h}\n相対: x=${f(r.x/W)} y=${f(r.y/H)} w=${f(r.w/W)} h=${f(r.h/H)}`;}
+
+  $('autoBtn').addEventListener('click',()=>{
+    if(!img)return;const res=autoBand();
+    if(!res){status.innerHTML='<span class="w">帯を自動検出できませんでした。スポイトで青い背景をタップしてください。</span>';return;}
+    commit(res.rect,res.bg);
+    if(selRect)status.innerHTML=`<b>検出完了</b> — スコア領域 ${selRect.w}×${selRect.h}px`;});
+  $('clearSel').addEventListener('click',()=>{selRect=null;bandRect=null;drawSel();showCoords();preview.width=10;preview.height=10;status.textContent='';chips.innerHTML='';out.value='';});
+
+  /* ---- pointer: eyedropper + manual drag ---- */
+  let dragging=false,downC=null,downImg=null,moved=false;
+  const cxy=e=>{const t=e.touches&&e.touches[0];return{cx:t?t.clientX:e.clientX,cy:t?t.clientY:e.clientY};};
+  const toImg=(cx,cy)=>{const r=dispCanvas.getBoundingClientRect();
+    return{ix:clamp((cx-r.left)/dispScale,0,img.naturalWidth),iy:clamp((cy-r.top)/dispScale,0,img.naturalHeight)};};
+  function down(e){if(!img)return;const{cx,cy}=cxy(e);downC={cx,cy};downImg=toImg(cx,cy);moved=false;
+    if(mode==='drag'){dragging=true;selRect={x:downImg.ix,y:downImg.iy,w:0,h:0};e.preventDefault();}}
+  function move(e){if(!dragging)return;const{cx,cy}=cxy(e);if(Math.hypot(cx-downC.cx,cy-downC.cy)>6)moved=true;
+    const p=toImg(cx,cy);selRect={x:Math.min(downImg.ix,p.ix),y:Math.min(downImg.iy,p.iy),w:Math.abs(p.ix-downImg.ix),h:Math.abs(p.iy-downImg.iy)};
+    drawSel();e.preventDefault();}
+  function up(){if(mode==='drag'&&dragging){dragging=false;
+      if(selRect&&selRect.w>3&&selRect.h>3){bandRect=null;drawSel();buildPreview();showCoords();}else{selRect=null;drawSel();}}
+    else if(mode==='pick'&&downImg&&!moved){pickAt(downImg.ix,downImg.iy);}dragging=false;}
+  imgWrap.addEventListener('mousedown',down);window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  imgWrap.addEventListener('touchstart',down,{passive:false});window.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+
+  function pickAt(ixf,iyf){
+    const ix=Math.round(ixf),iy=Math.round(iyf);const pc=sctx().getImageData(ix,iy,1,1).data;
+    const bg=[pc[0],pc[1],pc[2]];
+    const W0=img.naturalWidth,H0=img.naturalHeight,dw=Math.min(W0,700),s=dw/W0,dh=Math.round(H0*s);
+    const dc=document.createElement('canvas');dc.width=dw;dc.height=dh;
+    const dcc=dc.getContext('2d',{willReadFrequently:true});dcc.drawImage(srcCanvas,0,0,dw,dh);
+    const d=dcc.getImageData(0,0,dw,dh).data;
+    const sx=clamp(Math.round(ix*s),0,dw-1),sy=clamp(Math.round(iy*s),0,dh-1),tol=46,tol2=tol*tol;
+    const seen=new Uint8Array(dw*dh),stk=[sy*dw+sx];seen[sy*dw+sx]=1;
+    let minX=sx,maxX=sx,minY=sy,maxY=sy,cnt=0;
+    while(stk.length){const p=stk.pop(),px=p%dw,py=(p/dw)|0,o=p*4;
+      const dr=d[o]-bg[0],dg=d[o+1]-bg[1],db=d[o+2]-bg[2];if(dr*dr+dg*dg+db*db>tol2)continue;cnt++;
+      if(px<minX)minX=px;if(px>maxX)maxX=px;if(py<minY)minY=py;if(py>maxY)maxY=py;
+      if(px+1<dw&&!seen[p+1]){seen[p+1]=1;stk.push(p+1);}if(px-1>=0&&!seen[p-1]){seen[p-1]=1;stk.push(p-1);}
+      if(py+1<dh&&!seen[p+dw]){seen[p+dw]=1;stk.push(p+dw);}if(py-1>=0&&!seen[p-dw]){seen[p-dw]=1;stk.push(p-dw);}}
+    if(cnt<30){status.innerHTML='<span class="w">青い背景の余白をタップしてください。</span>';return;}
+    const pad=2,band={x:clamp(Math.floor(minX/s)-pad,0,W0),y:clamp(Math.floor(minY/s)-pad,0,H0),w:0,h:0};
+    band.w=clamp(Math.ceil((maxX+1)/s)+pad,0,W0)-band.x;band.h=clamp(Math.ceil((maxY+1)/s)+pad,0,H0)-band.y;
+    commit(band,bg);status.innerHTML=`<b>検出</b> — ${selRect.w}×${selRect.h}px`;}
+
+  /* ---- preview + download ---- */
+  function buildPreview(){if(!srcCanvas||!selRect)return null;const r=selRect,k=+$('scale').value;
+    const w=Math.max(1,Math.round(r.w*k)),h=Math.max(1,Math.round(r.h*k));preview.width=w;preview.height=h;
+    const ctx=preview.getContext('2d');ctx.imageSmoothingQuality='high';ctx.drawImage(srcCanvas,r.x,r.y,r.w,r.h,0,0,w,h);return preview;}
+  $('scale').addEventListener('input',()=>{$('scaleV').textContent=$('scale').value+'×';if(selRect)buildPreview();});
+  $('dlBtn').addEventListener('click',()=>{if(!selRect){status.textContent='先に領域を検出してください';return;}
+    const c=document.createElement('canvas');c.width=selRect.w;c.height=selRect.h;
+    c.getContext('2d').drawImage(srcCanvas,selRect.x,selRect.y,selRect.w,selRect.h,0,0,selRect.w,selRect.h);
+    const a=document.createElement('a');a.download='score-crop.png';a.href=c.toDataURL('image/png');a.click();});
+
+  /* ---- OCR (optional) ---- */
+  const WL={digits:'0123456789,',roman:'IVX',free:''};
+  async function ensureWorker(){if(worker)return worker;status.textContent='エンジン初期化中…';
+    worker=await Tesseract.createWorker('eng',1,{logger:m=>{if(m.status)status.textContent=`${m.status} ${(m.progress*100||0).toFixed(0)}%`;}});return worker;}
+  $('run').addEventListener('click',async()=>{
+    if(!selRect){status.textContent='先に領域を検出してください';return;}
+    const k=+$('scale').value,w=Math.round(selRect.w*k),h=Math.round(selRect.h*k);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.imageSmoothingQuality='high';ctx.drawImage(srcCanvas,selRect.x,selRect.y,selRect.w,selRect.h,0,0,w,h);
+    const id=ctx.getImageData(0,0,w,h),px=id.data;for(let i=0;i<px.length;i+=4){const g=0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];px[i]=px[i+1]=px[i+2]=g;}ctx.putImageData(id,0,0);
+    $('run').disabled=true;out.value='';chips.innerHTML='';
+    try{const wk=await ensureWorker();
+      await wk.setParameters({tessedit_char_whitelist:WL[$('cmode').value],tessedit_pageseg_mode:$('psm').value});
+      const{data}=await wk.recognize(c);const text=(data.text||'').trim();out.value=text||'(認識できず)';
+      const nums=(text.match(/\d[\d,]*/g)||[]).filter(x=>x.replace(/\D/g,'').length>=1);
+      chips.innerHTML='';nums.forEach(n=>{const el=document.createElement('span');el.className='chip';el.textContent=n;
+        el.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(n);el.textContent=n+' ✓';setTimeout(()=>el.textContent=n,800);};chips.appendChild(el);});
+      status.innerHTML=text?`<b>OCR完了</b> — 信頼度 ${data.confidence?data.confidence.toFixed(0):'?'}%`:'認識できず';
+    }catch(e){console.error(e);status.innerHTML='<span class="w">エラー: '+(e.message||e)+'</span>';}finally{$('run').disabled=false;}});
+
+  window.addEventListener('resize',()=>{if(img)render();});
+})();
+</script>
+</body>
+</html>
