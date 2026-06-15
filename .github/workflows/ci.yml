@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Install dependencies
+        run: aube ci
+      - name: Lint and format check
+        run: biome check
+      - name: Test
+        run: aube test
+      - name: Build
+        run: aube run build

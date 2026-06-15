@@ -1,0 +1,25 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Requires repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID,
+    # and a Cloudflare Pages project named "frostboard".
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Install dependencies
+        run: aube ci
+      - name: Build
+        run: aube run build
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=frostboard
