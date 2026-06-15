@@ -2,10 +2,8 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 import { Controls } from "./components/Controls";
 import { ScorePanel } from "./components/ScorePanel";
 import { type Mode, Stage } from "./components/Stage";
+import { useDetectionWorker } from "./hooks/useDetectionWorker";
 import { useSourceImage } from "./hooks/useSourceImage";
-import { autoBand } from "./lib/band-detect";
-import { bandFromSeed } from "./lib/eyedropper";
-import { isolateScore } from "./lib/score-isolate";
 import {
 	DEFAULT_PARAMS,
 	type IsolateParams,
@@ -15,8 +13,10 @@ import {
 
 function App() {
 	const { source, load, reset } = useSourceImage();
+	const { ready, auto, pick, isolate } = useDetectionWorker(source);
 	const fileRef = useRef<HTMLInputElement>(null);
 	const stageRef = useRef<HTMLDivElement>(null);
+	const isolateSeq = useRef(0);
 
 	const [params, setParams] = useState<IsolateParams>(DEFAULT_PARAMS);
 	const [scoreOnly, setScoreOnly] = useState(true);
@@ -49,20 +49,23 @@ function App() {
 	// parameters change. Manual drag selections leave band === null and are
 	// kept as-is.
 	useEffect(() => {
-		if (!source || !band || !bg) return;
+		if (!ready || !band || !bg) return;
 		if (!scoreOnly) {
 			setSel(band);
 			return;
 		}
-		const r = isolateScore(source.imageData, band, bg, params);
-		if (r) {
-			setSel(r);
-			setStatus(`検出完了 — スコア領域 ${r.w}×${r.h}px`);
-		} else {
-			setSel(band);
-			setStatus("スコア行を分離できず。感度/開始位置を調整、または手動で。");
-		}
-	}, [source, band, bg, params, scoreOnly]);
+		const seq = ++isolateSeq.current;
+		isolate(band, bg, params).then((r) => {
+			if (seq !== isolateSeq.current) return; // a newer request superseded this one
+			if (r) {
+				setSel(r);
+				setStatus(`検出完了 — スコア領域 ${r.w}×${r.h}px`);
+			} else {
+				setSel(band);
+				setStatus("スコア行を分離できず。感度/開始位置を調整、または手動で。");
+			}
+		});
+	}, [ready, band, bg, params, scoreOnly, isolate]);
 
 	const loadFile = (file: File) => {
 		setBand(null);
@@ -72,9 +75,8 @@ function App() {
 		load(file).catch((e) => setStatus(`読み込み失敗: ${e.message}`));
 	};
 
-	const onDetect = () => {
-		if (!source) return;
-		const res = autoBand(source.imageData);
+	const onDetect = async () => {
+		const res = await auto();
 		if (!res) {
 			setStatus(
 				"帯を自動検出できませんでした。スポイトで青い背景をタップしてください。",
@@ -85,9 +87,8 @@ function App() {
 		setBand(res.rect);
 	};
 
-	const onPick = (ix: number, iy: number) => {
-		if (!source) return;
-		const res = bandFromSeed(source.imageData, ix, iy);
+	const onPick = async (ix: number, iy: number) => {
+		const res = await pick(ix, iy);
 		if (!res) {
 			setStatus("青い背景の余白をタップしてください。");
 			return;
@@ -130,7 +131,7 @@ function App() {
 				<div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
 					<section className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
 						<Controls
-							disabled={!source}
+							disabled={!ready}
 							mode={mode}
 							zoom={zoom}
 							scoreOnly={scoreOnly}
