@@ -8,7 +8,7 @@ A browser tool that, from a mobile-game ranking screenshot, **auto-detects the s
 
 ## Stack & tooling
 
-Vite + React + TypeScript, Tailwind CSS v4, Tesseract.js v7, Vitest, Biome. Toolchain is the jdx/en.dev ecosystem: **mise** (tool versions in `mise.toml`), **aube** (pnpm-compatible package manager; `aube install/add/run/exec/ci`, lockfile `aube-lock.yaml`), **hk** (git hooks in `hk.pkl`, composed from builtins). Do not substitute npm/pnpm/yarn — use aube.
+Vite + React + TypeScript, Tailwind CSS v4, Tesseract.js v7, Vitest, Biome. Toolchain is the jdx/en.dev ecosystem: **mise** (tool versions in `mise.toml`), **aube** (pnpm-compatible package manager; `aube install/add/run/exec/ci`, lockfile `pnpm-lock.yaml` — aube maintains the standard pnpm lockfile in place, so Renovate/pnpm interoperate), **hk** (git hooks in `hk.pkl`, composed from builtins). Do not substitute npm/pnpm/yarn — use aube.
 
 ## Commands
 
