@@ -1,0 +1,36 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:best-practices", ":pinAllExceptPeerDependencies"],
+	"minimumReleaseAge": "3 days",
+	"osvVulnerabilityAlerts": true,
+	"vulnerabilityAlerts": {
+		"minimumReleaseAge": "0 days"
+	},
+	"lockFileMaintenance": {
+		"enabled": true,
+		"automerge": true
+	},
+	"packageRules": [
+		{
+			"description": "Automerge devDependencies (build tooling) on non-major updates",
+			"matchDepTypes": ["devDependencies"],
+			"matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+			"automerge": true
+		},
+		{
+			"description": "Automerge range-pins and digest updates (e.g. GitHub Action SHAs)",
+			"matchUpdateTypes": ["pin", "digest"],
+			"automerge": true
+		},
+		{
+			"description": "Require manual review for production (runtime) dependencies — they ship to users, so never automerge them",
+			"matchDepTypes": ["dependencies"],
+			"automerge": false
+		},
+		{
+			"description": "Keep pnpm on 9.x to match aube's lockfileVersion 9 support",
+			"matchDepNames": ["pnpm"],
+			"allowedVersions": "<10"
+		}
+	]
+}
