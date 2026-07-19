@@ -13,21 +13,21 @@
 		"format": "biome check --write"
 	},
 	"dependencies": {
-		"react": "^19.2.6",
-		"react-dom": "^19.2.6",
-		"tesseract.js": "^7.0.0"
+		"react": "19.2.7",
+		"react-dom": "19.2.7",
+		"tesseract.js": "7.0.0"
 	},
 	"devDependencies": {
-		"@tailwindcss/vite": "^4.3.1",
-		"@types/node": "^24.13.2",
+		"@tailwindcss/vite": "4.3.1",
+		"@types/node": "24.13.2",
 		"@types/react": "19.2.17",
 		"@types/react-dom": "19.2.3",
-		"@vitejs/plugin-react": "^6.0.2",
-		"tailwindcss": "^4.3.1",
-		"typescript": "~7.0.0",
-		"vite": "^8.1.5",
-		"vite-plugin-static-copy": "^4.1.1",
-		"vitest": "^4.1.9",
-		"wrangler": "^4.100.0"
+		"@vitejs/plugin-react": "6.0.2",
+		"tailwindcss": "4.3.1",
+		"typescript": "7.0.2",
+		"vite": "8.1.5",
+		"vite-plugin-static-copy": "4.1.1",
+		"vitest": "4.1.9",
+		"wrangler": "4.100.0"
 	}
 }
