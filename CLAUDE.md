@@ -8,7 +8,7 @@ A browser tool that, from a mobile-game ranking screenshot, **auto-detects the s
 
 ## Stack & tooling
 
-Vite + React + TypeScript, Tailwind CSS v4, Tesseract.js v7, Vitest, Biome. Toolchain is the jdx/en.dev ecosystem: **mise** (tool versions in `mise.toml`), **aube** (pnpm-compatible package manager; `aube install/add/run/exec/ci`, lockfile `aube-lock.yaml`), **hk** (git hooks in `hk.pkl`, composed from builtins). Do not substitute npm/pnpm/yarn — use aube.
+Vite + React + TypeScript, Tailwind CSS v4, Tesseract.js v7, Vitest, Biome. Toolchain is the jdx/en.dev ecosystem: **mise** (tool versions in `mise.toml`), **aube** (pnpm-compatible package manager; `aube install/run/exec/ci`, lockfile `pnpm-lock.yaml`), **hk** (git hooks in `hk.pkl`, composed from builtins). Use **aube** for everything; `.npmrc` (`auto-install-peers=false`) makes aube and pnpm/Renovate serialize the lockfile identically — see [Dependency changes & the lockfile](#dependency-changes--the-lockfile). Do not use npm/yarn.
 
 ## Commands
 
@@ -23,6 +23,14 @@ hk install         # install git hooks (once)
 ```
 
 The hk hooks run Biome + hygiene checks on pre-commit, enforce Conventional Commits on commit-msg, and run `aube test` on pre-push.
+
+### Dependency changes & the lockfile
+
+The repo commits the standard `pnpm-lock.yaml`, shared by aube (local) and pnpm (Renovate, and any `pnpm --frozen-lockfile` consumer such as a Cloudflare native build). `.npmrc` sets **`auto-install-peers=false`**, which **both** aube and pnpm honor, so they serialize the lockfile identically.
+
+Why it's needed: with the default `auto-install-peers=true`, `aube add` hoists an auto-installed optional peer (`jiti`, from vite) into the importer as a direct dependency, which pnpm does not — so `pnpm --frozen-lockfile` rejects the aube-written lockfile (`ERR_PNPM_OUTDATED_LOCKFILE`). That still reproduces on aube 1.29.1 (the older `time:`-block divergence was fixed in ~1.26; the `jiti` injection was not). Turning the setting off removes the divergence at the source.
+
+So **use aube for everything, including `aube add/remove/update`** — the lockfile stays canonical for Renovate and pnpm-native builds, with no normalization step. Keep `packageManager: pnpm@9.x` pinned so pnpm/Renovate resolve with pnpm 9 (Renovate is constrained to pnpm `<10`). Note: missing *required* peers now surface as warnings instead of being silently installed — declare them explicitly (this matches pnpm's own opt-out default). `jiti` here was an unused optional peer; build and tests pass without it.
 
 ### Regression test (required whenever the algorithm changes)
 
