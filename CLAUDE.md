@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A browser tool that, from a mobile-game ranking screenshot, **auto-detects the score-number region of your own row** and optionally reads it as a number via OCR. Runs entirely in the browser, no paid API (Tesseract.js v7 = WASM, self-hosted; only the language data is fetched from a CDN), works on iOS/Android. **Region detection is pure image processing** (saturation + projection profiling), not OCR.
+A browser tool that, from a mobile-game ranking screenshot, **auto-detects the score-number region of your own row** and optionally reads it as a number via OCR. Runs entirely in the browser, no paid API (Tesseract.js v7 = WASM, fully self-hosted including the language data — nothing is fetched from a CDN at runtime), works on iOS/Android. **Region detection is pure image processing** (saturation + projection profiling), not OCR.
 
 ## Stack & tooling
 
@@ -44,7 +44,7 @@ Detection logic is **pure, DOM-independent functions in `src/lib`** (operate on 
 - `src/lib/score-isolate.ts` — `isolateScore(img, band, bg, params)`: **ink = farther than `inktol` from the background blue AND low saturation (`sat ≤ satMax`)** (drops the colorful avatar). Row-project over the right zone (`x ≥ rstart*W`) → bottom-most tall-enough line = the score line (name line is above) → column-project bridging digit/comma gaps → **widest group = the number**. Returns the bbox with pad=4.
 - `src/lib/eyedropper.ts` — `bandFromSeed()`: flood-fill the band from a tapped blue pixel (fallback).
 - `src/lib/color.ts` / `image.ts` — dominant-color/ink helpers; downscale + connected-component/flood-fill.
-- `src/lib/ocr.ts` — optional Tesseract wrapper (grayscale → whitelist + PSM). Worker + core wasm are self-hosted (copied to `/tesseract` by `vite-plugin-static-copy` in `vite.config.ts`); `langPath` points to the CDN.
+- `src/lib/ocr.ts` — optional Tesseract wrapper (grayscale → whitelist + PSM). Worker + core wasm + language data (`eng.traineddata.gz`, from the `@tesseract.js-data/eng` dev dependency) are all self-hosted (copied to `/tesseract` by `vite-plugin-static-copy` in `vite.config.ts`); `langPath` points to `/tesseract/lang`.
 
 Target UI layout (your own row is a solid blue band): top = rank / avatar / alliance name + user name; bottom = score number. We only want the bottom-right score.
 

@@ -9,8 +9,8 @@ row** in a mobile-game ranking screenshot and optionally reads it with OCR.
 
 ## Tech stack
 
-Vite · React · TypeScript · Tailwind CSS v4 · Tesseract.js v7 (self-hosted, language
-data from CDN) · Vitest · Biome. Tooling via [mise](https://mise.jdx.dev) (tool
+Vite · React · TypeScript · Tailwind CSS v4 · Tesseract.js v7 (fully self-hosted,
+including language data) · Vitest · Biome. Tooling via [mise](https://mise.jdx.dev) (tool
 versions), [aube](https://github.com/jdx/aube) (package manager), and
 [hk](https://hk.jdx.dev) (git hooks).
 
