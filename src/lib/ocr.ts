@@ -12,14 +12,15 @@ const WHITELIST: Record<CharMode, string> = {
 const base = import.meta.env.BASE_URL;
 
 /**
- * Worker options: the worker script and core wasm are served from our own
- * origin (copied into /tesseract by vite-plugin-static-copy); only the
- * language data is fetched from the CDN.
+ * Worker options: the worker script, core wasm, and language data are all
+ * served from our own origin (copied into /tesseract by vite-plugin-static-copy).
+ * Nothing is fetched from a CDN at runtime. langPath is a directory; the worker
+ * appends `/${lang}.traineddata.gz`.
  */
 const WORKER_OPTIONS = {
 	workerPath: `${base}tesseract/worker.min.js`,
 	corePath: `${base}tesseract/`,
-	langPath: "https://tessdata.projectnaptha.com/4.0.0",
+	langPath: `${base}tesseract/lang`,
 };
 
 let workerPromise: Promise<Worker> | null = null;
