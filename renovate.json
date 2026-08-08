@@ -28,9 +28,9 @@
 			"automerge": false
 		},
 		{
-			"description": "Keep pnpm on 9.x to match aube's lockfileVersion 9 support",
+			"description": "Keep pnpm on 11.x to match aube's pnpm-lock.yaml v9 support",
 			"matchDepNames": ["pnpm"],
-			"allowedVersions": "<10"
+			"allowedVersions": ">=11 <12"
 		}
 	]
 }
