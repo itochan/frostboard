@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
-	"packageManager": "pnpm@9.15.9",
+	"packageManager": "pnpm@11.20.0",
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc -b && vite build",
@@ -29,6 +29,6 @@
 		"vite": "8.2.0",
 		"vite-plugin-static-copy": "4.1.1",
 		"vitest": "4.1.10",
-		"wrangler": "4.118.0"
+		"wrangler": "4.119.0"
 	}
 }

@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: false
+  tesseract.js: false
+  workerd: false
+autoInstallPeers: false
+enableGlobalVirtualStore: false
+strictDepBuilds: false
